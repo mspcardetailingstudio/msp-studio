@@ -3,8 +3,9 @@ import './App.css';
 import {
   Car, Users, IndianRupee, CalendarClock, Plus, Copy, Check,
   Sparkles, ClipboardList, CalendarDays, LayoutDashboard,
-  Trash2, Phone, Mail, Tag, Palette, BadgeCheck, Clock, Truck, CircleDot,
-  Star, Zap, Shield, Droplets, RefreshCw, AlertCircle, Wifi, WifiOff
+  Trash2, Phone, Mail, Tag, Palette, CircleDot,
+  Star, Zap, Shield, Droplets, RefreshCw, AlertCircle, Wifi,
+  Printer, FileText, Wallet
 } from "lucide-react";
 
 const SUPABASE_URL = "https://vhdefudjosivafnfopzd.supabase.co";
@@ -76,7 +77,10 @@ const SAMPLE_APPOINTMENTS = [
 
 const fmt  = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 const calc = (sids) => sids.reduce((s, sid) => s + (SERVICES.find(sv => sv.id === sid)?.price || 0), 0);
-const emptyForm = { name:"", phone:"", email:"", carModel:"", plate:"", color:"", services:[], status:"Queued" };
+const todayStr = () => new Date().toISOString().split("T")[0];
+const displayDate = (d) => new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+
+const emptyForm = { name:"", phone:"", email:"", carModel:"", plate:"", color:"", services:[], status:"Queued", payment:"Cash" };
 
 const flattenRow = (log) => ({
   id:       log.id,
@@ -89,6 +93,8 @@ const flattenRow = (log) => ({
   services: log.services            || [],
   status:   log.status              || "Queued",
   bill:     log.total_bill          || 0,
+  payment:  log.payment_mode        || "Cash",
+  created:  log.created_at          || new Date().toISOString(),
 });
 
 export default function App() {
@@ -102,6 +108,7 @@ export default function App() {
   const [copied, setCopied]     = useState(null);
   const [toast,  setToast]      = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [reportDate, setReportDate] = useState(todayStr());
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -109,19 +116,15 @@ export default function App() {
   };
 
   const loadEntries = useCallback(async () => {
-    setLoading(true);
-    setDbError(null);
+    setLoading(true); setDbError(null);
     try {
       const rows = await sb(
-        "services_log?select=id,services,total_bill,status,created_at,customers(name,phone,email),vehicles(car_model,plate,color)&order=created_at.desc",
+        "services_log?select=id,services,total_bill,status,payment_mode,created_at,customers(name,phone,email),vehicles(car_model,plate,color)&order=created_at.desc",
         { method: "GET" }
       );
       setEntries((rows || []).map(flattenRow));
-    } catch (e) {
-      setDbError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setDbError(e.message); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
@@ -133,8 +136,7 @@ export default function App() {
     if (!form.carModel)                e.carModel = "Select a car";
     if (!form.plate.trim())            e.plate    = "Required";
     if (!form.services.length)         e.services = "Select at least one service";
-    setErrors(e);
-    return !Object.keys(e).length;
+    setErrors(e); return !Object.keys(e).length;
   };
 
   const handleSubmit = async () => {
@@ -151,47 +153,87 @@ export default function App() {
       });
       await sb("services_log", {
         method: "POST",
-        body: JSON.stringify({ customer_id: customer.id, vehicle_id: vehicle.id, services: form.services, total_bill: calc(form.services), status: form.status }),
+        body: JSON.stringify({
+          customer_id: customer.id, vehicle_id: vehicle.id,
+          services: form.services, total_bill: calc(form.services),
+          status: form.status, payment_mode: form.payment,
+        }),
       });
-      setForm(emptyForm);
-      setErrors({});
-      setShowForm(false);
+      setForm(emptyForm); setErrors({}); setShowForm(false);
       showToast("✅ Customer, vehicle & service saved!");
       await loadEntries();
-    } catch (e) {
-      showToast(`❌ Save failed: ${e.message}`, "error");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { showToast(`❌ Save failed: ${e.message}`, "error"); }
+    finally { setSaving(false); }
   };
 
   const updateStatus = async (id, status) => {
     setEntries(prev => prev.map(e => e.id === id ? { ...e, status } : e));
-    try {
-      await sb(`services_log?id=eq.${id}`, { method: "PATCH", prefer: "return=minimal", body: JSON.stringify({ status }) });
-    } catch (e) {
-      showToast(`Status update failed: ${e.message}`, "error");
-      loadEntries();
-    }
+    try { await sb(`services_log?id=eq.${id}`, { method:"PATCH", prefer:"return=minimal", body: JSON.stringify({ status }) }); }
+    catch (e) { showToast(`Status update failed: ${e.message}`, "error"); loadEntries(); }
   };
 
   const deleteEntry = async (id) => {
     setEntries(prev => prev.filter(e => e.id !== id));
-    try {
-      await sb(`services_log?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
-    } catch (e) {
-      showToast(`Delete failed: ${e.message}`, "error");
-      loadEntries();
-    }
+    try { await sb(`services_log?id=eq.${id}`, { method:"DELETE", prefer:"return=minimal" }); }
+    catch (e) { showToast(`Delete failed: ${e.message}`, "error"); loadEntries(); }
   };
 
   const toggleService = (sid) =>
     setForm(f => ({ ...f, services: f.services.includes(sid) ? f.services.filter(s => s !== sid) : [...f.services, sid] }));
 
-  const copyPromo = (idx, msg) => {
-    navigator.clipboard.writeText(msg);
-    setCopied(idx);
-    setTimeout(() => setCopied(null), 2500);
+  const copyPromo = (idx, msg) => { navigator.clipboard.writeText(msg); setCopied(idx); setTimeout(() => setCopied(null), 2500); };
+
+  // ── Report data ──
+  const reportEntries = entries.filter(e => e.created.startsWith(reportDate));
+  const reportTotal   = reportEntries.reduce((s, e) => s + e.bill, 0);
+  const cashTotal     = reportEntries.filter(e => e.payment === "Cash").reduce((s, e) => s + e.bill, 0);
+  const gpayTotal     = reportEntries.filter(e => e.payment === "GPay").reduce((s, e) => s + e.bill, 0);
+
+  const printReport = () => {
+    const win = window.open("", "_blank");
+    const rows = reportEntries.map((e, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${e.carModel}</td>
+        <td>${e.plate}</td>
+        <td>${e.phone}</td>
+        <td>${e.services.map(sid => SERVICES.find(s => s.id === sid)?.label || sid).join(", ")}</td>
+        <td>₹${Number(e.bill).toLocaleString("en-IN")}</td>
+        <td class="${e.payment === 'Cash' ? 'cash' : 'gpay'}">${e.payment}</td>
+      </tr>`).join("");
+    win.document.write(`
+      <html><head><title>MSP Daily Report — ${displayDate(reportDate)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+        h2 { margin: 0 0 4px; font-size: 20px; }
+        p  { margin: 0 0 20px; color: #555; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #1e3a8a; color: white; padding: 10px 12px; text-align: left; }
+        td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        .cash { color: #16a34a; font-weight: 700; }
+        .gpay { color: #7c3aed; font-weight: 700; }
+        .summary { margin-top: 20px; display: flex; gap: 24px; }
+        .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 18px; min-width: 140px; }
+        .box .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .box .val   { font-size: 20px; font-weight: 800; margin-top: 4px; }
+        @media print { button { display: none; } }
+      </style></head><body>
+      <h2>🚗 MSP Studio Hub — Daily Report</h2>
+      <p>Date: ${displayDate(reportDate)} &nbsp;|&nbsp; Generated: ${new Date().toLocaleTimeString("en-IN")}</p>
+      <table>
+        <thead><tr><th>No.</th><th>Car Make / Model</th><th>Vehicle Number</th><th>Contact Number</th><th>Service Type</th><th>Price</th><th>Payment</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="summary">
+        <div class="box"><div class="label">Total Jobs</div><div class="val">${reportEntries.length}</div></div>
+        <div class="box"><div class="label">Total Revenue</div><div class="val" style="color:#1d4ed8">₹${Number(reportTotal).toLocaleString("en-IN")}</div></div>
+        <div class="box"><div class="label">Cash</div><div class="val" style="color:#16a34a">₹${Number(cashTotal).toLocaleString("en-IN")}</div></div>
+        <div class="box"><div class="label">GPay</div><div class="val" style="color:#7c3aed">₹${Number(gpayTotal).toLocaleString("en-IN")}</div></div>
+      </div>
+      <br/><button onclick="window.print()">🖨️ Print / Save as PDF</button>
+      </body></html>`);
+    win.document.close();
   };
 
   const totalRevenue = entries.filter(e => e.status === "Completed" || e.status === "Delivered").reduce((s, e) => s + e.bill, 0);
@@ -199,21 +241,21 @@ export default function App() {
   const inWorkshop   = entries.filter(e => e.status === "In Progress").length;
 
   const TABS = [
-    { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-    { id: "promos",       label: "Promotions",   icon: Sparkles        },
-    { id: "appointments", label: "Appointments", icon: CalendarDays    },
+    { id: "dashboard",    label: "Dashboard",     icon: LayoutDashboard },
+    { id: "report",       label: "Daily Report",  icon: FileText        },
+    { id: "promos",       label: "Promotions",    icon: Sparkles        },
+    { id: "appointments", label: "Appointments",  icon: CalendarDays    },
   ];
 
-  const S = { fontFamily: "'DM Sans','Segoe UI',sans-serif", minHeight: "100vh", background: "#0b1120", color: "#e2e8f0" };
-
   return (
-    <div style={S}>
+    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", minHeight:"100vh", background:"#0b1120", color:"#e2e8f0" }}>
       {toast && (
         <div style={{ position:"fixed", top:16, right:16, zIndex:999, background:toast.type==="error"?"#1c0a0a":"#052e16", border:`1px solid ${toast.type==="error"?"#7f1d1d":"#16a34a"}`, color:toast.type==="error"?"#f87171":"#4ade80", borderRadius:10, padding:"12px 18px", fontSize:13, fontWeight:600, boxShadow:"0 8px 32px #00000060", maxWidth:400 }}>
           {toast.msg}
         </div>
       )}
 
+      {/* Header */}
       <header style={{ background:"linear-gradient(135deg,#0f1e3a 0%,#0b1120 100%)", borderBottom:"1px solid #1e2d4a", padding:"0 24px", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ maxWidth:1280, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:64 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -240,6 +282,7 @@ export default function App() {
 
       <main style={{ maxWidth:1280, margin:"0 auto", padding:"28px 24px" }}>
 
+        {/* ── DASHBOARD ── */}
         {tab === "dashboard" && (
           <div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:28 }}>
@@ -295,7 +338,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16, marginBottom:20 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:16, marginBottom:20 }}>
                   <div>
                     <label style={{ display:"block", fontSize:12, color:"#64748b", marginBottom:6, fontWeight:600, textTransform:"uppercase", letterSpacing:0.5 }}>Car Model *</label>
                     <div style={{ position:"relative" }}>
@@ -323,6 +366,18 @@ export default function App() {
                       <Palette size={14} color="#475569" style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)" }} />
                       <input value={form.color} onChange={e => setForm(p => ({...p,color:e.target.value}))} placeholder="e.g. Pearl White"
                         style={{ width:"100%", background:"#0b1120", border:"1px solid #1e2d4a", borderRadius:8, padding:"10px 12px 10px 32px", color:"#e2e8f0", fontSize:14, outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  </div>
+                  {/* Payment Mode */}
+                  <div>
+                    <label style={{ display:"block", fontSize:12, color:"#64748b", marginBottom:6, fontWeight:600, textTransform:"uppercase", letterSpacing:0.5 }}>Payment Mode *</label>
+                    <div style={{ display:"flex", gap:8 }}>
+                      {["Cash","GPay"].map(pm => (
+                        <button key={pm} type="button" onClick={() => setForm(p => ({...p, payment: pm}))}
+                          style={{ flex:1, padding:"10px", borderRadius:8, border:`1px solid ${form.payment===pm?(pm==="Cash"?"#16a34a":"#7c3aed"):"#1e2d4a"}`, background:form.payment===pm?(pm==="Cash"?"#052e16":"#2e1065"):"#0b1120", color:form.payment===pm?(pm==="Cash"?"#4ade80":"#a78bfa"):"#475569", fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                          {pm === "Cash" ? "💵" : "📱"} {pm}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -374,6 +429,7 @@ export default function App() {
               </div>
             )}
 
+            {/* All entries table */}
             <div style={{ background:"#0d1b2e", border:"1px solid #1e3a5f", borderRadius:16, overflow:"hidden" }}>
               <div style={{ padding:"18px 24px", borderBottom:"1px solid #1e2d4a", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div style={{ fontSize:15, fontWeight:700, color:"#93c5fd", display:"flex", alignItems:"center", gap:8 }}>
@@ -386,7 +442,7 @@ export default function App() {
                 <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
                   <thead>
                     <tr style={{ background:"#0b1631" }}>
-                      {["Customer","Phone","Car Model","Plate","Services","Total Bill","Status",""].map(h => (
+                      {["Customer","Phone","Car Model","Plate","Services","Total Bill","Payment","Status",""].map(h => (
                         <th key={h} style={{ padding:"12px 16px", textAlign:"left", color:"#475569", fontWeight:600, fontSize:11, letterSpacing:0.6, textTransform:"uppercase", borderBottom:"1px solid #1e2d4a" }}>{h}</th>
                       ))}
                     </tr>
@@ -418,6 +474,11 @@ export default function App() {
                           </td>
                           <td style={{ padding:"14px 16px", fontWeight:700, color:"#34d399", fontSize:14 }}>{fmt(entry.bill)}</td>
                           <td style={{ padding:"14px 16px" }}>
+                            <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, background:entry.payment==="Cash"?"#052e16":"#2e1065", color:entry.payment==="Cash"?"#4ade80":"#a78bfa", border:`1px solid ${entry.payment==="Cash"?"#16a34a":"#7c3aed"}` }}>
+                              {entry.payment === "Cash" ? "💵 Cash" : "📱 GPay"}
+                            </span>
+                          </td>
+                          <td style={{ padding:"14px 16px" }}>
                             <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700 }} className={meta.color}>
                               <span style={{ width:6, height:6, borderRadius:"50%", display:"inline-block" }} className={meta.dot} />
                               <select value={entry.status} onChange={e => updateStatus(entry.id, e.target.value)}
@@ -436,7 +497,7 @@ export default function App() {
                       );
                     })}
                     {!loading && entries.length === 0 && (
-                      <tr><td colSpan={8} style={{ padding:40, textAlign:"center", color:"#334155" }}>No entries yet. Register your first customer above.</td></tr>
+                      <tr><td colSpan={9} style={{ padding:40, textAlign:"center", color:"#334155" }}>No entries yet. Register your first customer above.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -445,6 +506,107 @@ export default function App() {
           </div>
         )}
 
+        {/* ── DAILY REPORT ── */}
+        {tab === "report" && (
+          <div>
+            <div style={{ marginBottom:24, display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:12 }}>
+              <div>
+                <div style={{ fontSize:22, fontWeight:800, color:"#f1f5f9", marginBottom:4 }}>📊 Daily Report</div>
+                <div style={{ fontSize:14, color:"#475569" }}>All jobs completed on a selected date.</div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)}
+                  style={{ background:"#0d1b2e", border:"1px solid #1e3a5f", borderRadius:8, padding:"9px 14px", color:"#e2e8f0", fontSize:13, outline:"none", cursor:"pointer" }} />
+                <button onClick={printReport}
+                  style={{ display:"flex", alignItems:"center", gap:7, background:"linear-gradient(135deg,#1d4ed8,#3b82f6)", color:"white", border:"none", borderRadius:8, padding:"10px 18px", fontWeight:600, fontSize:13, cursor:"pointer" }}>
+                  <Printer size={15} /> Print / Save PDF
+                </button>
+              </div>
+            </div>
+
+            {/* Summary cards */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }}>
+              {[
+                { label:"Total Jobs",    value:reportEntries.length,  accent:"#3b82f6", bg:"#0f2447", prefix:"" },
+                { label:"Total Revenue", value:fmt(reportTotal),      accent:"#10b981", bg:"#042f1e", prefix:"" },
+                { label:"💵 Cash",        value:fmt(cashTotal),        accent:"#16a34a", bg:"#052e16", prefix:"" },
+                { label:"📱 GPay",        value:fmt(gpayTotal),        accent:"#7c3aed", bg:"#2e1065", prefix:"" },
+              ].map((k,i) => (
+                <div key={i} style={{ background:k.bg, border:`1px solid ${k.accent}40`, borderRadius:12, padding:"16px 20px" }}>
+                  <div style={{ fontSize:11, color:"#64748b", fontWeight:600, textTransform:"uppercase", letterSpacing:0.8, marginBottom:6 }}>{k.label}</div>
+                  <div style={{ fontSize:24, fontWeight:800, color:"#f1f5f9" }}>{k.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Report table */}
+            <div style={{ background:"#0d1b2e", border:"1px solid #1e3a5f", borderRadius:16, overflow:"hidden" }}>
+              <div style={{ padding:"16px 22px", borderBottom:"1px solid #1e2d4a", display:"flex", alignItems:"center", gap:8 }}>
+                <FileText size={16} color="#93c5fd" />
+                <span style={{ fontSize:14, fontWeight:700, color:"#93c5fd" }}>
+                  {reportEntries.length} job{reportEntries.length !== 1 ? "s" : ""} on {displayDate(reportDate)}
+                </span>
+              </div>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+                  <thead>
+                    <tr style={{ background:"#0b1631" }}>
+                      {["No.","Car Make / Model","Vehicle Number","Contact Number","Service Type","Price","Payment"].map(h => (
+                        <th key={h} style={{ padding:"12px 16px", textAlign:"left", color:"#475569", fontWeight:600, fontSize:11, letterSpacing:0.6, textTransform:"uppercase", borderBottom:"1px solid #1e2d4a" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportEntries.map((entry, i) => (
+                      <tr key={entry.id} style={{ borderBottom:"1px solid #0f1e3a", background:i%2===0?"transparent":"#090f1c" }}>
+                        <td style={{ padding:"14px 16px", color:"#64748b", fontWeight:600 }}>{i + 1}</td>
+                        <td style={{ padding:"14px 16px" }}>
+                          <div style={{ fontWeight:600, color:"#e2e8f0" }}>{entry.carModel}</div>
+                          <div style={{ color:"#475569", fontSize:11 }}>{entry.name}</div>
+                        </td>
+                        <td style={{ padding:"14px 16px" }}>
+                          <span style={{ background:"#0b1120", border:"1px solid #1e2d4a", borderRadius:6, padding:"3px 8px", color:"#94a3b8", fontFamily:"monospace", fontSize:12, letterSpacing:0.8 }}>{entry.plate}</span>
+                        </td>
+                        <td style={{ padding:"14px 16px", color:"#94a3b8" }}>{entry.phone}</td>
+                        <td style={{ padding:"14px 16px", maxWidth:200 }}>
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                            {entry.services.map(sid => {
+                              const sv = SERVICES.find(s => s.id === sid);
+                              return sv ? <span key={sid} style={{ background:"#0f2447", color:"#60a5fa", border:"1px solid #1e3a5f", borderRadius:5, padding:"2px 7px", fontSize:11, fontWeight:500 }}>{sv.label}</span> : null;
+                            })}
+                          </div>
+                        </td>
+                        <td style={{ padding:"14px 16px", fontWeight:700, color:"#34d399", fontSize:14 }}>{fmt(entry.bill)}</td>
+                        <td style={{ padding:"14px 16px" }}>
+                          <span style={{ padding:"4px 12px", borderRadius:20, fontSize:12, fontWeight:700, background:entry.payment==="Cash"?"#052e16":"#2e1065", color:entry.payment==="Cash"?"#4ade80":"#a78bfa", border:`1px solid ${entry.payment==="Cash"?"#16a34a":"#7c3aed"}` }}>
+                            {entry.payment === "Cash" ? "💵 Cash" : "📱 GPay"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {reportEntries.length === 0 && (
+                      <tr><td colSpan={7} style={{ padding:40, textAlign:"center", color:"#334155" }}>No jobs recorded for {displayDate(reportDate)}.</td></tr>
+                    )}
+                  </tbody>
+                  {reportEntries.length > 0 && (
+                    <tfoot>
+                      <tr style={{ background:"#0b1631", borderTop:"2px solid #1e3a5f" }}>
+                        <td colSpan={5} style={{ padding:"14px 16px", fontWeight:700, color:"#64748b", fontSize:13 }}>TOTAL ({reportEntries.length} jobs)</td>
+                        <td style={{ padding:"14px 16px", fontWeight:800, color:"#34d399", fontSize:16 }}>{fmt(reportTotal)}</td>
+                        <td style={{ padding:"14px 16px", fontSize:12, color:"#64748b" }}>
+                          <div>💵 {fmt(cashTotal)}</div>
+                          <div>📱 {fmt(gpayTotal)}</div>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── PROMOTIONS ── */}
         {tab === "promos" && (
           <div>
             <div style={{ marginBottom:24 }}>
@@ -473,6 +635,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ── APPOINTMENTS ── */}
         {tab === "appointments" && (
           <div>
             <div style={{ marginBottom:24 }}>
