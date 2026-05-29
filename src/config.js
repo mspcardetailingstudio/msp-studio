@@ -3,18 +3,47 @@ export const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 
 export const ADMIN_PASSWORD    = "MSPADMIN1234";
 export const EMPLOYEE_PASSWORD = "MSP1234";
+export const MSP_WHATSAPP      = "917483593673";
+export const MSP_EMAIL         = "mspcardetailingstudio@gmail.com";
 
-export const MSP_WHATSAPP = "917483593673";  // country code + number
-export const MSP_EMAIL    = "mspcardetailingstudio@gmail.com";
+// ── Car categories for Foam Wash pricing ──
+export const CAR_CATEGORIES = [
+  "Hatchback",
+  "Sedan",
+  "Sedan (Long Boot)",
+  "7 Seater / MUV",
+  "SUV",
+];
 
+// Foam Wash prices by category × source (Customer / Garage)
+export const FOAM_WASH_PRICES = {
+  customer: {
+    "Hatchback":          500,
+    "Sedan":              550,
+    "Sedan (Long Boot)":  600,
+    "7 Seater / MUV":     700,
+    "SUV":                600,
+  },
+  garage: {
+    "Hatchback":          300,
+    "Sedan":              300,
+    "Sedan (Long Boot)":  400,
+    "7 Seater / MUV":     400,
+    "SUV":                400,
+    "Omni / Van":         350,
+  },
+};
+
+// Services list — prices here are defaults only; actual prices
+// are stored per-car-model in Supabase (service_prices table).
 export const SERVICES = [
-  { id:"foam",      label:"Full Car Foam Wash",     price:500   },
-  { id:"polish",    label:"Car Polishing",          price:3000  },
-  { id:"ppf",       label:"PPF Coating",            price:80000 },
-  { id:"ceramic",   label:"Ceramic Coating",        price:25000 },
-  { id:"rub",       label:"Rubbing & Polishing",    price:2500  },
-  { id:"headlight", label:"Headlight Buffing",      price:800   },
-  { id:"paint",     label:"Paint Work & Tinkering", price:5000  },
+  { id:"foam",      label:"Full Car Foam Wash",     defaultPrice:500  },
+  { id:"polish",    label:"Car Polishing",          defaultPrice:3000 },
+  { id:"ppf",       label:"PPF Coating",            defaultPrice:80000},
+  { id:"ceramic",   label:"Ceramic Coating",        defaultPrice:25000},
+  { id:"rub",       label:"Rubbing & Polishing",    defaultPrice:2500 },
+  { id:"headlight", label:"Headlight Buffing",      defaultPrice:800  },
+  { id:"paint",     label:"Paint Work & Tinkering", defaultPrice:5000 },
 ];
 
 export const CAR_MODELS = [
@@ -68,7 +97,7 @@ export const CAR_MODELS = [
   "Renault Captur","Renault Lodgy","Renault Scala","Renault Fluence","Renault Koleos",
   // Nissan
   "Nissan Magnite","Nissan Kicks","Nissan Terrano","Nissan Micra",
-  "Nissan Sunny","Nissan GT-R","Nissan 370Z","Nissan Teana","Nissan X-Trail",
+  "Nissan Sunny","Nissan GT-R","Nissan Teana","Nissan X-Trail",
   // Volkswagen
   "Volkswagen Polo","Volkswagen Vento","Volkswagen Taigun","Volkswagen Virtus",
   "Volkswagen Tiguan","Volkswagen T-Roc","Volkswagen Passat","Volkswagen Ameo",
@@ -94,9 +123,9 @@ export const CAR_MODELS = [
   "Audi A4","Audi A6","Audi A8","Audi Q3","Audi Q5","Audi Q7","Audi Q8",
   "Audi e-tron","Audi RS5","Audi TT",
   // Others
-  "Fiat Punto","Fiat Linea","Fiat Avventura","Fiat Abarth 595",
+  "Fiat Punto","Fiat Linea","Fiat Avventura",
   "Chevrolet Beat","Chevrolet Cruze","Chevrolet Spark","Chevrolet Tavera","Chevrolet Captiva","Chevrolet Trailblazer",
-  "Mitsubishi Pajero","Mitsubishi Outlander","Mitsubishi Montero","Mitsubishi Eclipse Cross","Mitsubishi Cedia",
+  "Mitsubishi Pajero","Mitsubishi Outlander","Mitsubishi Eclipse Cross","Mitsubishi Cedia",
   "Isuzu D-Max","Isuzu MU-X","Isuzu MU-7",
   "Citroen C3","Citroen C3 Aircross","Citroen C5 Aircross","Citroen eC3",
   "Porsche Cayenne","Porsche Macan","Porsche 911","Porsche Panamera","Porsche Taycan",
@@ -107,14 +136,13 @@ export const CAR_MODELS = [
 ];
 
 export const STATUS_META = {
-  Queued:        { dot:"bg-slate-400",    badge:"bg-slate-700 text-slate-200"     },
-  "In Progress": { dot:"bg-blue-400",     badge:"bg-blue-900 text-blue-200"       },
-  Completed:     { dot:"bg-emerald-400",  badge:"bg-emerald-900 text-emerald-200" },
-  Delivered:     { dot:"bg-violet-400",   badge:"bg-violet-900 text-violet-200"   },
+  Queued:        { dot:"bg-slate-400",   badge:"bg-slate-700 text-slate-200"     },
+  "In Progress": { dot:"bg-blue-400",    badge:"bg-blue-900 text-blue-200"       },
+  Completed:     { dot:"bg-emerald-400", badge:"bg-emerald-900 text-emerald-200" },
+  Delivered:     { dot:"bg-violet-400",  badge:"bg-violet-900 text-violet-200"   },
 };
 
-export const fmt  = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
-export const calc = (sids) => sids.reduce((s,sid) => s + (SERVICES.find(sv=>sv.id===sid)?.price||0), 0);
+export const fmt     = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 export const todayStr = () => new Date().toISOString().split("T")[0];
 
 export const sb = async (path, opts={}) => {
