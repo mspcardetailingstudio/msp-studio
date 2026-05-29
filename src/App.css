@@ -1,0 +1,14 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0b1120; }
+@keyframes spin { to { transform: rotate(360deg); } }
+select option { background: #0b1120; color: #e2e8f0; }
+input::placeholder { color: #334155; }
+button:hover { opacity: 0.9; }
+.bg-slate-700   { background-color: #334155; } .text-slate-200   { color: #e2e8f0; } .bg-slate-400   { background-color: #94a3b8; }
+.bg-blue-900    { background-color: #1e3a8a; } .text-blue-200    { color: #bfdbfe; } .bg-blue-400    { background-color: #60a5fa; }
+.bg-emerald-900 { background-color: #064e3b; } .text-emerald-200 { color: #a7f3d0; } .bg-emerald-400 { background-color: #34d399; }
+.bg-violet-900  { background-color: #2e1065; } .text-violet-200  { color: #ddd6fe; } .bg-violet-400  { background-color: #a78bfa; }
+.bg-blue-500    { background-color: #3b82f6; } .bg-violet-500    { background-color: #8b5cf6; } .bg-amber-500 { background-color: #f59e0b; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0b1120; }
+::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
