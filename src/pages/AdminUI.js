@@ -388,7 +388,7 @@ export default function AdminUI({ onLogout }) {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:16 }}>
                 <div>
                   <div style={{ fontSize:16, fontWeight:700, color:"#f1f5f9", marginBottom:4, display:"flex", alignItems:"center", gap:8 }}>
-                    {promoActive?<ToggleRight size={22} color="#4ade80"/>:<ToggleLeft size={22} color="#475569}"/>}
+                    {promoActive?<ToggleRight size={22} color="#4ade80"/>:<ToggleLeft size={22} color="#475569"/>}
                     Pickup & Drop Promo — 100% OFF up to 5km
                   </div>
                   <div style={{ fontSize:13, color:"#64748b" }}>When ON, customers see the promo offer on the booking page and get free pickup up to 5km.</div>

@@ -7,7 +7,7 @@ const emptyForm = {
   carModel:"", plate:"", color:"",
   date:"", time:"", services:[], notes:"",
   pickup: false,
-  pickupAddress:"", distanceKm:"",
+  pickupAddress:"", pickupMapsLink:"", distanceKm:"",
 };
 
 // Pickup pricing logic
@@ -79,6 +79,7 @@ export default function CustomerBooking({ onBack, promoActive, promoEndDate }) {
         notes:          form.notes||null,
         pickup_requested: form.pickup,
         pickup_address: form.pickup ? form.pickupAddress : null,
+        pickup_maps_link: form.pickup && form.pickupMapsLink ? form.pickupMapsLink : null,
         pickup_distance_km: form.pickup ? parseFloat(form.distanceKm)||0 : null,
         pickup_charge:  form.pickup ? pickup : 0,
         status:"Pending",
@@ -86,7 +87,7 @@ export default function CustomerBooking({ onBack, promoActive, promoEndDate }) {
 
       const svcNames = form.services.map(id=>SERVICES.find(s=>s.id===id)?.label).join(", ");
       const waText = encodeURIComponent(
-        `🚗 *New Booking at MSP Studio!*\n\n👤 Name: ${form.name}\n📞 Phone: ${form.phone}\n🚘 Car: ${form.carModel} (${form.plate})\n🛠️ Services: ${svcNames}\n💰 Services: ${fmt(svcTotal)}\n${form.pickup?`🚐 Pickup: ${form.pickupAddress} (${form.distanceKm} km) — ${pickInfo?.text}\n💰 Grand Total: ${fmt(grandTotal)}\n`:""}\n📅 Date: ${form.date} at ${form.time}\n📝 Notes: ${form.notes||"—"}\n\n_Please confirm this appointment._`
+        `🚗 *New Booking at MSP Studio!*\n\n👤 Name: ${form.name}\n📞 Phone: ${form.phone}\n🚘 Car: ${form.carModel} (${form.plate})\n🛠️ Services: ${svcNames}\n💰 Services: ${fmt(svcTotal)}\n${form.pickup?`🚐 Pickup: ${form.pickupAddress} (${form.distanceKm} km) — ${pickInfo?.text}\n${form.pickupMapsLink?"📍 Maps: "+form.pickupMapsLink+"\n":""}💰 Grand Total: ${fmt(grandTotal)}\n`:""}\n📅 Date: ${form.date} at ${form.time}\n📝 Notes: ${form.notes||"—"}\n\n_Please confirm this appointment._`
       );
       const emailSub  = encodeURIComponent(`New Booking: ${form.name} — ${form.date}`);
       const emailBody = encodeURIComponent(`New appointment at MSP Studio:\n\nName: ${form.name}\nPhone: ${form.phone}\nCar: ${form.carModel} (${form.plate})\nServices: ${svcNames}\nDate: ${form.date} at ${form.time}${form.pickup?`\nPickup: ${form.pickupAddress} (${form.distanceKm}km) — ${pickup===0?"FREE":fmt(pickup)}`:""}\nTotal: ${fmt(grandTotal)}\nNotes: ${form.notes||"—"}`);
@@ -381,6 +382,23 @@ export default function CustomerBooking({ onBack, promoActive, promoEndDate }) {
                     </div>
                     {errors.pickupAddress&&<div style={{ fontSize:11,color:"#f87171",marginTop:3 }}>{errors.pickupAddress}</div>}
                   </div>
+                  <div style={{ marginBottom:12 }}>
+                    <label style={lbl}>Google Maps Pin Link (optional)</label>
+                    <div style={{ position:"relative" }}>
+                      <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14 }}>📍</span>
+                      <input value={form.pickupMapsLink} onChange={e=>setForm(p=>({...p,pickupMapsLink:e.target.value}))}
+                        placeholder="Paste Google Maps link e.g. https://maps.app.goo.gl/..."
+                        style={inp({ paddingLeft:32 })}/>
+                    </div>
+                    {form.pickupMapsLink && (
+                      <a href={form.pickupMapsLink} target="_blank" rel="noreferrer"
+                        style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:6, fontSize:12, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
+                        🗺️ Open in Google Maps →
+                      </a>
+                    )}
+                    <div style={{ fontSize:11, color:"#475569", marginTop:4 }}>Open Google Maps → long press your location → tap the coordinates → Share → Copy link</div>
+                  </div>
+
                   <div>
                     <label style={lbl}>Distance from MSP Studio (in km) *</label>
                     <input type="number" step="0.1" min="0" value={form.distanceKm} onChange={e=>setForm(p=>({...p,distanceKm:e.target.value}))} placeholder="e.g. 3.5"
