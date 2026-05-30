@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Car, Plus, ClipboardList, CalendarDays, RefreshCw, LogOut, Bell } from "lucide-react";
+import { Car, Plus, ClipboardList, CalendarDays, RefreshCw, LogOut, Bell, Search } from "lucide-react";
 import { sb, SERVICES, STATUS_META, fmt, MSP_WHATSAPP } from "../config";
 import IntakeForm from "../components/IntakeForm";
 
@@ -9,6 +9,7 @@ export default function EmployeeUI({ onLogout }) {
   const [appts,   setAppts]  = useState([]);
   const [loading, setLoading]= useState(false);
   const [toast,   setToast]  = useState(null);
+  const [searchQ, setSearchQ] = useState("");
 
   const showToast = (msg, type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
 
@@ -75,12 +76,17 @@ export default function EmployeeUI({ onLogout }) {
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
               <div style={{ fontSize:16, fontWeight:700, color:"#93c5fd" }}>Today's Jobs ({entries.length})</div>
+              <div style={{ position:"relative" }}>
+                <Search size={13} color="#475569" style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)" }}/>
+                <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search plate or phone…"
+                  style={{ background:"#0b1120", border:"1px solid #1e2d4a", borderRadius:8, padding:"7px 12px 7px 30px", color:"#e2e8f0", fontSize:12, outline:"none", width:200 }}/>
+              </div>
               <button onClick={loadData} style={{ display:"flex", alignItems:"center", gap:6, background:"#0d1b2e", border:"1px solid #1e3a5f", color:"#64748b", borderRadius:8, padding:"8px 12px", cursor:"pointer", fontSize:12 }}>
                 <RefreshCw size={13} style={{ animation:loading?"spin 1s linear infinite":"none" }}/> Refresh
               </button>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {entries.map(e=>{
+              {entries.filter(e=>!searchQ||e.plate.toLowerCase().includes(searchQ.toLowerCase())||e.phone.includes(searchQ)||e.name.toLowerCase().includes(searchQ.toLowerCase())).map(e=>{
                 const meta=STATUS_META[e.status]||STATUS_META.Queued;
                 return <div key={e.id} style={{ background:"#0d1b2e", border:"1px solid #1e3a5f", borderRadius:12, padding:"14px 18px", display:"grid", gridTemplateColumns:"2fr 1fr 1.5fr auto auto", gap:12, alignItems:"center" }}>
                   <div><div style={{ fontWeight:700, color:"#e2e8f0" }}>{e.name}</div><div style={{ color:"#64748b", fontSize:12 }}>{e.phone}</div></div>

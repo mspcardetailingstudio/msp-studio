@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Car, Users, IndianRupee, CalendarClock, Plus, Copy, Check, Sparkles, ClipboardList, CalendarDays, LayoutDashboard, Trash2, RefreshCw, AlertCircle, Wifi, FileText, Printer, LogOut, Settings } from "lucide-react";
+import { Car, Users, IndianRupee, CalendarClock, Plus, Copy, Check, Sparkles, ClipboardList, CalendarDays, LayoutDashboard, Trash2, RefreshCw, AlertCircle, Wifi, FileText, Printer, LogOut, Settings, Search, ToggleLeft, ToggleRight, Calendar } from "lucide-react";
 import { sb, SERVICES, STATUS_META, fmt, todayStr, MSP_WHATSAPP } from "../config";
 import IntakeForm from "../components/IntakeForm";
 import PricingManager from "./PricingManager";
@@ -45,6 +45,10 @@ export default function AdminUI({ onLogout }) {
   const loadData = useCallback(async () => {
     setLoading(true); setDbError(null);
     try {
+      // Load promo settings
+      sb("promo_settings?id=eq.1&select=active,end_date",{ method:"GET" })
+        .then(rows=>{ if(rows&&rows[0]){ setPromoActive(rows[0].active); setPromoEndDate(rows[0].end_date||""); } })
+        .catch(()=>{});
       const [logs, bookings] = await Promise.all([
         sb("services_log?select=id,services,total_bill,status,payment_mode,vehicle_source,car_category,created_at,customers(name,phone,email),vehicles(car_model,plate,color)&order=created_at.desc", { method:"GET" }),
         sb("appointments?select=*&order=appt_date.asc,appt_time.asc", { method:"GET" }),
@@ -125,6 +129,15 @@ export default function AdminUI({ onLogout }) {
     win.document.close();
   };
 
+  const savePromo = async () => {
+    setPromoSaving(true);
+    try {
+      await sb("promo_settings", { method:"POST", prefer:"resolution=merge-duplicates,return=minimal", body:JSON.stringify({ id:1, active:promoActive, end_date:promoEndDate||null }) });
+      showToast(promoActive?"🎉 Promo is now LIVE!":"Promo ended.");
+    } catch(e) { showToast("Save failed: "+e.message,"error"); }
+    finally { setPromoSaving(false); }
+  };
+
   const TABS = [
     { id:"dashboard", label:"Dashboard",    icon:LayoutDashboard },
     { id:"report",    label:"Daily Report", icon:FileText        },
@@ -202,6 +215,11 @@ export default function AdminUI({ onLogout }) {
             <div style={{ background:"#0d1b2e", border:"1px solid #1e3a5f", borderRadius:16, overflow:"hidden" }}>
               <div style={{ padding:"16px 22px", borderBottom:"1px solid #1e2d4a", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div style={{ fontSize:14, fontWeight:700, color:"#93c5fd", display:"flex", alignItems:"center", gap:8 }}><ClipboardList size={16}/>All Entries ({entries.length})</div>
+                <div style={{ position:"relative" }}>
+                  <Search size={13} color="#475569" style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)" }}/>
+                  <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search by plate or phone…"
+                    style={{ background:"#0b1120", border:"1px solid #1e2d4a", borderRadius:8, padding:"7px 12px 7px 30px", color:"#e2e8f0", fontSize:12, outline:"none", width:220 }}/>
+                </div>
                 {dbError&&<div style={{ fontSize:12, color:"#f87171", display:"flex", alignItems:"center", gap:5 }}><AlertCircle size={13}/>{dbError}</div>}
               </div>
               <div style={{ overflowX:"auto" }}>
@@ -210,7 +228,7 @@ export default function AdminUI({ onLogout }) {
                     {["Customer","Phone","Car","Plate","Services","Bill","Payment","Source","Status",""].map(h=><th key={h} style={{ padding:"11px 12px", textAlign:"left", color:"#475569", fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:0.5, borderBottom:"1px solid #1e2d4a" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {entries.map((e,i)=>{
+                    {entries.filter(e=>!searchQuery||e.plate.toLowerCase().includes(searchQuery.toLowerCase())||e.phone.includes(searchQuery)||e.name.toLowerCase().includes(searchQuery.toLowerCase())).map((e,i)=>{
                       const meta=STATUS_META[e.status]||STATUS_META.Queued;
                       const sb2=sourceBadge(e.source);
                       return <tr key={e.id} style={{ borderBottom:"1px solid #0f1e3a", background:i%2===0?"transparent":"#090f1c" }}>
@@ -365,6 +383,39 @@ export default function AdminUI({ onLogout }) {
         {/* ── PROMOTIONS ── */}
         {tab==="promos"&&(
           <div>
+            {/* Promo Manager */}
+            <div style={{ background:"#0d1b2e", border:`2px solid ${promoActive?"#16a34a":"#1e3a5f"}`, borderRadius:16, padding:24, marginBottom:28 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:16 }}>
+                <div>
+                  <div style={{ fontSize:16, fontWeight:700, color:"#f1f5f9", marginBottom:4, display:"flex", alignItems:"center", gap:8 }}>
+                    {promoActive?<ToggleRight size={22} color="#4ade80"/>:<ToggleLeft size={22} color="#475569}"/>}
+                    Pickup & Drop Promo — 100% OFF up to 5km
+                  </div>
+                  <div style={{ fontSize:13, color:"#64748b" }}>When ON, customers see the promo offer on the booking page and get free pickup up to 5km.</div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={()=>setPromoActive(true)} style={{ padding:"8px 16px", borderRadius:8, border:`1px solid ${promoActive?"#16a34a":"#1e2d4a"}`, background:promoActive?"#052e16":"#0b1120", color:promoActive?"#4ade80":"#475569", fontWeight:700, fontSize:13, cursor:"pointer" }}>🟢 ON</button>
+                  <button onClick={()=>setPromoActive(false)} style={{ padding:"8px 16px", borderRadius:8, border:`1px solid ${!promoActive?"#7f1d1d":"#1e2d4a"}`, background:!promoActive?"#1c0a0a":"#0b1120", color:!promoActive?"#f87171":"#475569", fontWeight:700, fontSize:13, cursor:"pointer" }}>🔴 OFF</button>
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:18, alignItems:"end" }}>
+                <div>
+                  <label style={{ display:"block", fontSize:11, color:"#64748b", fontWeight:600, textTransform:"uppercase", letterSpacing:0.8, marginBottom:6 }}>Offer End Date (optional)</label>
+                  <div style={{ position:"relative" }}>
+                    <Calendar size={14} color="#475569" style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)" }}/>
+                    <input type="date" value={promoEndDate} onChange={e=>setPromoEndDate(e.target.value)}
+                      style={{ width:"100%", background:"#0b1120", border:"1px solid #1e2d4a", borderRadius:8, padding:"10px 12px 10px 32px", color:"#e2e8f0", fontSize:13, outline:"none", boxSizing:"border-box" }}/>
+                  </div>
+                  <div style={{ fontSize:11, color:"#475569", marginTop:4 }}>Shown to customers on the booking page. Leave blank for open-ended.</div>
+                </div>
+                <button onClick={savePromo} disabled={promoSaving}
+                  style={{ background:promoActive?"linear-gradient(135deg,#16a34a,#4ade80)":"linear-gradient(135deg,#1d4ed8,#3b82f6)", color:"white", border:"none", borderRadius:8, padding:"11px", fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                  {promoSaving?<><RefreshCw size={14} style={{ animation:"spin 1s linear infinite" }}/>Saving…</>:(promoActive?"🚀 Save & Go Live":"💾 Save Settings")}
+                </button>
+              </div>
+              {promoActive&&<div style={{ marginTop:14, background:"#052e16", border:"1px solid #16a34a", borderRadius:8, padding:"10px 14px", fontSize:13, color:"#4ade80", fontWeight:600 }}>✅ Promo is LIVE — customers see the 100% OFF offer on their booking page right now!</div>}
+            </div>
+
             <div style={{ fontSize:22, fontWeight:800, color:"#f1f5f9", marginBottom:4 }}>📣 WhatsApp Campaign Messages</div>
             <div style={{ fontSize:14, color:"#475569", marginBottom:20 }}>Copy and send via WhatsApp Business.</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20 }}>
