@@ -39,6 +39,10 @@ export default function AdminUI({ onLogout }) {
   const [showForm,   setShowForm]  = useState(false);
   const [reportDate, setReportDate]= useState(todayStr());
   const [dbError,    setDbError]   = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [promoActive, setPromoActive] = useState(false);
+  const [promoEndDate,setPromoEndDate]= useState("");
+  const [promoSaving, setPromoSaving] = useState(false);
 
   const showToast = (msg, type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
 
